@@ -55,24 +55,32 @@
       margin: 0 0 8px;
       font-size: 15px;
     }
+
+    /* ✅ 1) 手機版 1~5 永遠同一排：不允許換行 + 平均分配 */
     .row{
-      display:flex;
-      flex-wrap: wrap;
-      gap: 10px;
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 8px;
       align-items: center;
+      justify-content: space-between;
     }
     .pill{
+      flex: 1;
       display: inline-flex;
       align-items:center;
+      justify-content: center;
       gap: 8px;
       border: 1px solid #ddd;
-      padding: 8px 10px;
+      padding: 10px 8px;
       border-radius: 999px;
       cursor: pointer;
       user-select: none;
       background: #fff;
+      min-width: 0;
+      box-sizing: border-box;
     }
     .pill input{ margin:0; }
+
     .legend{
       display:flex;
       gap: 10px;
@@ -81,11 +89,13 @@
       font-size: 13px;
       margin-top: 8px;
     }
+
     .btns{
       display:flex;
       gap: 10px;
       flex-wrap: wrap;
       margin-top: 12px;
+      align-items: center;
     }
     button{
       border: 0;
@@ -128,6 +138,16 @@
       gap: 10px;
       align-items:center;
     }
+    @media (max-width: 520px){
+      .barrow{
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+      .barrow > div:last-child{
+        text-align: left !important;
+      }
+    }
+
     .k{ font-weight: 650; }
     .tag{
       font-size: 12px;
@@ -175,6 +195,13 @@
       font-size: 13px;
       background:#fbfbfe;
     }
+
+    /* 進一步確保小螢幕不擠：縮小 gap/字體 */
+    @media (max-width: 420px){
+      .row{ gap: 6px; }
+      .pill{ padding: 10px 6px; gap: 6px; }
+      .pill span{ font-size: 13px; }
+    }
   </style>
 </head>
 <body>
@@ -199,9 +226,9 @@
       <div id="questions" class="grid"></div>
 
       <div class="btns">
-        <button class="primary" id="btnCalc">產生分析</button>
-        <button class="ghost" id="btnAutoDemo" title="示範填入：你先前給的分數">套用示範分數</button>
+        <!-- ✅ 3) 清空重填放在產生分析左邊 -->
         <button class="danger" id="btnReset">清空重填</button>
+        <button class="primary" id="btnCalc">產生分析</button>
       </div>
 
       <div id="warn" class="warn"></div>
@@ -252,36 +279,11 @@
 
   // 五大向度（每個向度 2 題）
   const dims = [
-    {
-      key: "open",
-      name: "開放性",
-      desc: "創意、好奇、思維彈性與探索傾向",
-      q: [1,6]
-    },
-    {
-      key: "con",
-      name: "嚴謹性",
-      desc: "自律、計畫性、可靠度與執行力",
-      q: [2,7]
-    },
-    {
-      key: "ext",
-      name: "外向性",
-      desc: "社交能量、主動表達與外顯行動傾向",
-      q: [3,8]
-    },
-    {
-      key: "neu",
-      name: "情緒敏感度",
-      desc: "情緒波動與壓力反應傾向（分數高表示較敏感）",
-      q: [4,9]
-    },
-    {
-      key: "agr",
-      name: "宜人性",
-      desc: "同理、合作、關係維持與體諒傾向",
-      q: [5,10]
-    }
+    { key: "open", name: "開放性", desc: "創意、好奇、思維彈性與探索傾向", q: [1,6] },
+    { key: "con",  name: "嚴謹性", desc: "自律、計畫性、可靠度與執行力", q: [2,7] },
+    { key: "ext",  name: "外向性", desc: "社交能量、主動表達與外顯行動傾向", q: [3,8] },
+    { key: "neu",  name: "情緒敏感度", desc: "情緒波動與壓力反應傾向（分數高表示較敏感）", q: [4,9] },
+    { key: "agr",  name: "宜人性", desc: "同理、合作、關係維持與體諒傾向", q: [5,10] }
   ];
 
   // 建立題目介面
@@ -304,18 +306,13 @@
   });
 
   function getAnswer(n){
-    const el = document.querySelector(`input[name="q${n}"]:checked`);
+    const el = document.querySelector(\`input[name="q\${n}"]:checked\`);
     return el ? Number(el.value) : null;
-  }
-
-  function setAnswer(n, v){
-    const el = document.querySelector(`input[name="q${n}"][value="${v}"]`);
-    if(el) el.checked = true;
   }
 
   function clearAll(){
     items.forEach(it=>{
-      const checked = document.querySelector(`input[name="q${it.id}"]:checked`);
+      const checked = document.querySelector(\`input[name="q\${it.id}"]:checked\`);
       if(checked) checked.checked = false;
     });
     hideWarn();
@@ -338,28 +335,23 @@
 
   // 分數區間：每向度 2~10
   function levelLabel(sum){
-    if(sum <= 4) return { label: "偏低", tag: "偏低" };
-    if(sum <= 7) return { label: "中等", tag: "中等" };
-    return { label: "偏高", tag: "偏高" };
+    if(sum <= 4) return { label: "偏低" };
+    if(sum <= 7) return { label: "中等" };
+    return { label: "偏高" };
   }
 
   function inferProfile(scores){
-    // 依你的原本那種「客觀第三者」文字風格，組出輪廓描述
     const open = scores.open.sum, con = scores.con.sum, ext = scores.ext.sum, neu = scores.neu.sum, agr = scores.agr.sum;
-
     const parts = [];
 
-    // 開放性
     if(open >= 8) parts.push("思維彈性與探索傾向明顯");
     else if(open <= 4) parts.push("偏好熟悉路徑與務實做法");
     else parts.push("在新舊之間能取得平衡");
 
-    // 嚴謹性
     if(con >= 8) parts.push("做事有結構、可依賴度高");
     else if(con <= 4) parts.push("較隨性，重視當下效率與彈性");
     else parts.push("有一定規劃力，也保留彈性");
 
-    // 外向性（可出現矛盾型：一題低一題高）
     const q3 = scores.ext.qValues[0], q8 = scores.ext.qValues[1];
     if(q3 <= 2 && q8 >= 4){
       parts.push("偏「任務型表達」：不一定享受人多場合，但需要時能站出來");
@@ -369,12 +361,10 @@
       else parts.push("社交能量中等，視情境調整");
     }
 
-    // 情緒敏感度
     if(neu >= 8) parts.push("情緒敏感度高，對壓力與氛圍反應較快");
     else if(neu <= 4) parts.push("情緒穩定度高，遇事較能保持平衡");
     else parts.push("情緒反應中等，近期狀態會影響感受");
 
-    // 宜人性
     if(agr >= 8) parts.push("重視關係品質與互相體諒");
     else if(agr <= 4) parts.push("較直接、以原則與效率為先");
     else parts.push("能同理他人，也能保留自我界線");
@@ -383,9 +373,6 @@
   }
 
   function dimWriteup(dimKey, sum){
-    // 每向度給：判讀 / 優勢 / 可能盲點（以客觀語氣）
-    const lv = levelLabel(sum).label;
-
     const map = {
       open: {
         high: {
@@ -474,22 +461,18 @@
       }
     };
 
-    function pickBand(sum){
+    function band(sum){
       if(sum <= 4) return "low";
       if(sum <= 7) return "mid";
       return "high";
     }
-
-    const band = pickBand(sum);
-    return map[dimKey][band];
+    return map[dimKey][band(sum)];
   }
 
   function buildAdvice(scores){
     const open = scores.open.sum, con = scores.con.sum, ext = scores.ext.sum, neu = scores.neu.sum, agr = scores.agr.sum;
-
     const lines = [];
 
-    // 以「可操作」為主，不講抽象口號
     if(neu >= 8 && con >= 6){
       lines.push("用「結構」承接情緒：把困擾拆成可處理的三件事（現在能做／需要資訊／先放下），每次只處理一件。");
     }else if(neu >= 8){
@@ -502,7 +485,6 @@
       lines.push("想法多時，先定「一句話目標」與「停止條件」（做到什麼程度就先交付），避免越想越散。");
     }
 
-    // 外向/內向使用建議
     const q3 = scores.ext.qValues[0], q8 = scores.ext.qValues[1];
     if(q3 <= 2 && q8 >= 4){
       lines.push("你偏任務型表達：把需要曝光的事情設計成有腳本、有流程（開場、重點、收尾），會明顯降低消耗。");
@@ -536,20 +518,14 @@
       return;
     }
 
-    // 計算每向度分數
     const scores = {};
     dims.forEach(d=>{
       const qv = d.q.map(n => answers[n]);
       const sum = qv.reduce((a,b)=>a+b,0);
-      scores[d.key] = {
-        name: d.name,
-        desc: d.desc,
-        sum,
-        qValues: qv
-      };
+      scores[d.key] = { name: d.name, desc: d.desc, sum, qValues: qv };
     });
 
-    // 畫分數條
+    // 分數條
     const bars = document.getElementById("bars");
     bars.innerHTML = "";
     dims.forEach(d=>{
@@ -573,8 +549,8 @@
     });
 
     // 綜合輪廓
-    const profile = document.getElementById("profile");
-    profile.innerHTML = `<pre style="white-space:pre-wrap; margin:6px 0 0; font-family: inherit;">${inferProfile(scores)}</pre>`;
+    document.getElementById("profile").innerHTML =
+      `<pre style="white-space:pre-wrap; margin:6px 0 0; font-family: inherit;">${inferProfile(scores)}</pre>`;
 
     // 向度解析
     const details = document.getElementById("details");
@@ -628,16 +604,8 @@
     document.getElementById("result").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  // 按鈕事件
   document.getElementById("btnCalc").addEventListener("click", compute);
   document.getElementById("btnReset").addEventListener("click", clearAll);
-
-  // 你剛剛提供的示範分數：5 4 1 5 5 4 4 5 5 4
-  document.getElementById("btnAutoDemo").addEventListener("click", ()=>{
-    const demo = [5,4,1,5,5,4,4,5,5,4];
-    demo.forEach((v, idx)=> setAnswer(idx+1, v));
-    hideWarn();
-  });
 
   document.getElementById("btnCopy").addEventListener("click", async ()=>{
     const txt = document.getElementById("plainText").value || "";
